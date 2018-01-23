@@ -15,7 +15,7 @@ float clamp(float v, float min, float max) {
 	return v;
 }
 
-void set_rdata(char *byte, uint16_t hf, uint8_t lf, uint8_t hf_amp, uint16_t lf_amp) {
+void set_rdata(uint8_t *byte, uint16_t hf, uint8_t lf, uint8_t hf_amp, uint16_t lf_amp) {
 	byte[0] = hf & 0xFF;
 	byte[1] = hf_amp + ((hf >> 8) & 0xFF); //Add amp + 1st byte of frequency to amplitude byte
 	byte[2] = lf + ((lf_amp >> 8) & 0xFF); //Add freq + 1st byte of LF amplitude to the frequency byte
@@ -40,6 +40,17 @@ unsigned short fla_to_u16(float a) {
 	return r;
 }
 
+void make_rumble_data(float fhf, float flf,
+					  float fha, float fla, uint8_t buf[8]) {
+	flf = clamp(flf, 40.875885f, 626.286133f);
+	fhf = clamp(fhf, 81.75177f, 1252.572266f);
+
+	uint16_t hf = ((uint8_t)round(log2((double)fhf * 0.01) * 32.0) - 0x60) * 4;
+	uint8_t lf = (uint8_t)round(log2((double)flf * 0.01) * 32.0) - 0x40;
+	set_rdata(buf, hf, lf, fha_to_u8(fha), fla_to_u16(fla));
+	set_rdata(buf + 4, hf, lf, fha_to_u8(fha), fla_to_u16(fla));
+}
+
 void play_freq(joycon_t *jc,
 			   float fhf, float flf,
 			   float fha, float fla,
@@ -49,11 +60,12 @@ void play_freq(joycon_t *jc,
 
 	uint16_t hf = ((uint8_t)round(log2((double)fhf * 0.01) * 32.0) - 0x60) * 4;
 	uint8_t lf = (uint8_t)round(log2((double)flf * 0.01) * 32.0) - 0x40;
-	char buf[9] = {0};
+	uint8_t buf[9] = {0};
 	buf[0] = 0;
 	set_rdata(buf + 1, hf, lf, fha_to_u8(fha), fla_to_u16(fla));
 	set_rdata(buf + 5, hf, lf, fha_to_u8(fha), fla_to_u16(fla));
 	memcpy(jc->rumble_data, buf + 1, 8);
+	make_rumble_data(fhf, flf, fha, fla, jc->rumble_data);
 	jc_set_vibration(jc, 1);
 	jc_send_rumble(jc, buf);
 	usleep(duration);

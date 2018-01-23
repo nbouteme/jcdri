@@ -3,9 +3,17 @@
 
 #include <stdint.h>
 #include <hidapi.h>
+
+struct hid_device_ {
+	int device_handle;
+	int blocking;
+	int uses_numbered_reports;
+};
+
 #include <libevdev/libevdev-uinput.h>
 #include <libevdev/libevdev.h>
 #include <linux/uinput.h>
+#include <sys/poll.h>
 
 struct joycon_s;
 typedef struct joycon_s joycon_t;
@@ -228,24 +236,34 @@ typedef struct jc_dev_interface_s {
 	int uifd;
 	struct ff_effect rumble_patterns[10];
 	int used_patterns;
-	void (*play_effect)(struct jc_dev_interface_s*, int);
-	void (*stop_effect)(struct jc_dev_interface_s*, int);
+	void (*run_events)(struct jc_dev_interface_s *);
+	int (*write_fds)(struct jc_dev_interface_s *, struct pollfd *);
+	int (*read_fds)(struct jc_dev_interface_s *, struct pollfd *);
+	void (*play_effect)(struct jc_dev_interface_s *, int);
+	void (*stop_effect)(struct jc_dev_interface_s *, int);
 } jc_dev_interface_t;
 
 typedef struct {
 	jc_dev_interface_t base;
 	joycon_t *jc;
+	int jc_revents;
+	int ui_revents;
 } jc_device_t;
 
 typedef struct {
 	jc_dev_interface_t base;
 	joycon_t *left;
 	joycon_t *right;
+	int left_revents;
+	int right_revents;
+	int ui_revents;
 } djc_device_t;
 
 jc_device_t *jd_device_from_jc(joycon_t *jc);
 djc_device_t *jd_device_from_jc2(joycon_t *left, joycon_t *right);
 int jd_post_events_single(jc_device_t *dev);
 int jd_post_events_duo(djc_device_t *dev);
+int jd_wait_readable(int n, jc_dev_interface_t **devs);
+int next_tick();
 
 #endif /* JOYCON_H */

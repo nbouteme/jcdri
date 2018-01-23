@@ -9,7 +9,8 @@
 #include <limits.h>
 
 #include "rumble.h"
-
+#include <sys/poll.h>
+/*
 #define assert_null(x) {												\
 		int __error_code = x;											\
 		if (__error_code) {												\
@@ -18,43 +19,190 @@
 			return 0;													\
 		}																\
 	}																	\
+*/
+#define assert_null(x) x
 
 void play_effect_single(jc_dev_interface_t *dev, int id) {
 	jc_device_t *self = (void*)dev;
 	struct ff_effect *eff = dev->rumble_patterns + id;
 	switch(eff->type) {
 	case FF_RUMBLE:;
+		uint8_t rb[9] = {0};
 		float str = eff->u.rumble.strong_magnitude;
-		str /= 32768;
 		float wea = eff->u.rumble.weak_magnitude;
+
+		rb[0] = next_tick();
+		str /= 32768;
 		wea /= 49152;
-		play_freq(self->jc, 320, 160, str + 0.4, wea + 0.4, 1000);
+		make_rumble_data(320, 160, str + 0.4, wea + 0.4, rb + 1);
+		memcpy(self->jc->rumble_data, rb + 1, 8);
+		jc_set_vibration(self->jc, 1);
 		break;
-	default:
-		puts("Unsupported FF type");
 	}
-	printf("Playing effect %d on single joycon\n", id);
 }
 
 void stop_effect_single(jc_dev_interface_t *dev, int id) {
 	jc_device_t *self = (void*)dev;
-	(void)self;
 	(void)id;
-	printf("Stopping effect %d on single joycon\n", id);
+	jc_set_vibration(self->jc, 0);
 }
 
 void play_effect_duo(jc_dev_interface_t *dev, int id) {
 	djc_device_t *self = (void*)dev;
-	(void)self;
-	(void)id;
-	printf("Playing effect %d on single joycon", id);
+	struct ff_effect *eff = dev->rumble_patterns + id;
+	switch(eff->type) {
+	case FF_RUMBLE:;
+		uint8_t rb[9] = {0};
+		float str = eff->u.rumble.strong_magnitude;
+		float wea = eff->u.rumble.weak_magnitude;
+
+		rb[0] = next_tick();
+		str /= 32768;
+		wea /= 49152;
+		make_rumble_data(320, 160, str + 0.4, wea + 0.4, rb + 1);
+		memcpy(self->left->rumble_data, rb + 1, 8);
+		memcpy(self->right->rumble_data, rb + 1, 8);
+		jc_set_vibration(self->left, 1);
+		jc_set_vibration(self->right, 1);
+		break;
+	}
 }
 
 void stop_effect_duo(jc_dev_interface_t *dev, int id) {
 	djc_device_t *self = (void*)dev;
 	(void)self;
 	(void)id;
-	printf("Stopping effect %d on single joycon", id);
+	jc_set_vibration(self->left, 0);
+	jc_set_vibration(self->right, 0);
+}
+
+void upload_effect(jc_dev_interface_t *dev, struct ff_effect effect) {
+	int idx = effect.id;
+	if ((dev->used_patterns >> idx) & 1)
+		return;
+	dev->rumble_patterns[idx] = effect;
+	dev->used_patterns |= 1 << idx;
+}
+
+void erase_effect(jc_dev_interface_t *dev, int effect) {
+	int idx = effect;
+	if (!((dev->used_patterns >> idx) & 1))
+		return;
+	dev->used_patterns ^= 1 << idx;
+}
+
+void handle_input_events(jc_dev_interface_t *dev) {
+	int fd = dev->uifd;
+	struct input_event ev;
+	read(fd, &ev, sizeof(ev));
+	switch(ev.type) {
+	case EV_FF:
+		if (ev.code == FF_GAIN)
+			return;
+		if (ev.value)
+			dev->play_effect(dev, ev.code);
+		else
+			dev->stop_effect(dev, ev.code);
+		break;
+	case EV_UINPUT:
+		switch (ev.code) {
+		case UI_FF_UPLOAD:;
+			struct uinput_ff_upload upload;
+			memset(&upload, 0, sizeof(upload));
+			upload.request_id = ev.value;
+			ioctl(fd, UI_BEGIN_FF_UPLOAD, &upload);
+			upload_effect(dev, upload.effect);
+			upload.retval = 0;
+			ioctl(fd, UI_END_FF_UPLOAD, &upload);
+			break;
+		case UI_FF_ERASE:;
+			struct uinput_ff_erase erase;
+			memset(&erase, 0, sizeof(erase));
+			erase.request_id = ev.value;
+			ioctl(fd, UI_BEGIN_FF_ERASE, &erase);
+			erase_effect(dev, erase.effect_id);
+			erase.retval = 0;
+			ioctl(fd, UI_END_FF_ERASE, &erase);
+			break;
+		}
+		break;
+	}
+}
+
+void run_events_single(jc_dev_interface_t *dev) {
+	jc_device_t *self = (void*)dev;
+	if (self->jc_revents & POLLIN) {
+		jc_poll(self->jc);
+		jd_post_events_single(self);
+	}
+	if (self->ui_revents & POLLIN) {
+		handle_input_events(dev);
+	}
+}
+
+void run_events_dual(jc_dev_interface_t *dev) {
+	djc_device_t *self = (void*)dev;
+	if (self->left_revents & POLLIN) {
+		jc_poll(self->left);
+	}
+	if (self->right_revents & POLLIN) {
+		jc_poll(self->right);
+	}
+	jd_post_events_duo(self);
+	if (self->ui_revents & POLLIN) {
+		handle_input_events(dev);
+	}
+}
+
+int write_fds_single(jc_dev_interface_t *dev, struct pollfd *pfd) {
+	jc_device_t *self = (void*)dev;
+	// Linux hidraw device and uinput never replies with POLLOUT
+	
+	*pfd++ = (struct pollfd) {
+		dev->uifd, POLLIN, 0
+	};
+
+	*pfd++ = (struct pollfd) {
+		self->jc->dev->device_handle, POLLIN, 0
+	};
+
+	return 2;
+}
+
+int write_fds_dual(jc_dev_interface_t *dev, struct pollfd *pfd) {
+	djc_device_t *self = (void*)dev;
+	// Linux hidraw device and uinput never replies with POLLOUT
+	
+	*pfd++ = (struct pollfd) {
+		dev->uifd, POLLIN, 0
+	};
+
+	*pfd++ = (struct pollfd) {
+		self->left->dev->device_handle, POLLIN, 0
+	};
+
+	*pfd++ = (struct pollfd) {
+		self->right->dev->device_handle, POLLIN, 0
+	};
+
+	return 3;
+}
+
+int read_fds_single(jc_dev_interface_t *dev, struct pollfd *pfd) {
+	jc_device_t *self = (void*)dev;
+
+	self->ui_revents = pfd[0].revents;
+	self->jc_revents = pfd[1].revents;
+	return 2;
+}
+
+int read_fds_dual(jc_dev_interface_t *dev, struct pollfd *pfd) {
+	djc_device_t *self = (void*)dev;
+
+	self->ui_revents = pfd[0].revents;
+	self->left_revents = pfd[1].revents;
+	self->right_revents = pfd[2].revents;
+	return 3;
 }
 
 jc_device_t *jd_device_from_jc(joycon_t *jc) {
@@ -134,6 +282,9 @@ jc_device_t *jd_device_from_jc(joycon_t *jc) {
 	ret->base.uifd = libevdev_uinput_get_fd(ret->base.uidev);
 	ret->base.play_effect = play_effect_single;
 	ret->base.stop_effect = stop_effect_single;
+	ret->base.write_fds = write_fds_single;
+	ret->base.read_fds = read_fds_single;
+	ret->base.run_events = run_events_single;
 	ret->jc = jc;
 	return ret;
 }
@@ -226,8 +377,8 @@ int jd_post_events_duo(djc_device_t *dev) {
 	assert_null(libevdev_uinput_write_event(uidev, EV_KEY, BTN_TL2, left->buttons.zl));
 	assert_null(libevdev_uinput_write_event(uidev, EV_KEY, BTN_TR2, right->buttons.zr));
 
-	assert_null(libevdev_uinput_write_event(uidev, EV_KEY, BTN_THUMB, left->buttons.ls));
-	assert_null(libevdev_uinput_write_event(uidev, EV_KEY, BTN_THUMB2, right->buttons.rs));
+	assert_null(libevdev_uinput_write_event(uidev, EV_KEY, BTN_THUMBL, left->buttons.ls));
+	assert_null(libevdev_uinput_write_event(uidev, EV_KEY, BTN_THUMBR, right->buttons.rs));
 
 	assert_null(libevdev_uinput_write_event(uidev, EV_KEY, BTN_START, right->buttons.plus));
 	assert_null(libevdev_uinput_write_event(uidev, EV_KEY, BTN_SELECT, left->buttons.minus));
@@ -340,8 +491,8 @@ djc_device_t *jd_device_from_jc2(joycon_t *left, joycon_t *right) {
 	assert_null(libevdev_enable_event_code(dev, EV_KEY, BTN_TR2, NULL));
 
 	// Button 2 stick
-	assert_null(libevdev_enable_event_code(dev, EV_KEY, BTN_THUMB, NULL));
-	assert_null(libevdev_enable_event_code(dev, EV_KEY, BTN_THUMB2, NULL));
+	assert_null(libevdev_enable_event_code(dev, EV_KEY, BTN_THUMBL, NULL));
+	assert_null(libevdev_enable_event_code(dev, EV_KEY, BTN_THUMBR, NULL));
 
 	// Plus Minus
 	assert_null(libevdev_enable_event_code(dev, EV_KEY, BTN_START, NULL));
@@ -363,7 +514,33 @@ djc_device_t *jd_device_from_jc2(joycon_t *left, joycon_t *right) {
 	ret->base.uifd = libevdev_uinput_get_fd(ret->base.uidev);
 	ret->base.play_effect = play_effect_duo;
 	ret->base.stop_effect = stop_effect_duo;
+	ret->base.write_fds = write_fds_dual;
+	ret->base.read_fds = read_fds_dual;
+	ret->base.run_events = run_events_dual;
 	ret->left = left;
 	ret->right = right;
 	return ret;
+}
+
+int jd_wait_readable(int n, jc_dev_interface_t **devs) {
+	jc_dev_interface_t *reordered[n];
+	memset(reordered, 0, sizeof(reordered));
+	int idx = 0;
+	for (int i = 0; i < n; ++i) {
+		if (devs[i])
+			reordered[idx++] = devs[i];
+	}
+
+	struct pollfd fds[idx << 2];
+	int nfds = 0;
+	for(int i = 0; i < idx; ++i) {
+		nfds += reordered[i]->write_fds(reordered[i], fds + nfds);
+	}
+	poll(fds, nfds, -1);
+	nfds = 0;
+	for(int i = 0; i < idx; ++i) {
+		nfds += reordered[i]->read_fds(reordered[i], fds + nfds);
+	}
+	memcpy(devs, reordered, sizeof(reordered));
+	return idx;
 }

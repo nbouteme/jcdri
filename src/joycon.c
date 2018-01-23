@@ -68,7 +68,6 @@ void print_input_report(std_input_report_t rep) {
 	puts("\n");
 }
 
-
 int jc_send_rcmd(joycon_t *jc, std_output_report_t *cmd) {
 	if (hid_write(jc->dev, (void*)cmd, sizeof(*cmd)) < 0) {
 		dev_error(jc->dev, "Failed to write");
@@ -273,7 +272,7 @@ void jc_read_calibration_data(joycon_t *jc) {
 		jc->lcal.min_x  = jc->lcal.cen_x - jc->lcal.min_x;
 		jc->lcal.min_y  = jc->lcal.cen_y - jc->lcal.min_y;
 	} else {
-		cmd.cmd.spi_read_args.addr = 0x603D;
+		cmd.cmd.spi_read_args.addr = 0x6046;
 		jc_send_cmd(jc, &cmd);
 		do {
 			jc_read_message(jc, &res);
