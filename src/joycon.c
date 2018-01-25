@@ -7,7 +7,7 @@
 #include <math.h>
 #include <assert.h>
 
-#include "joycon.h"
+#include <joycon.h>
 #include "utils.h"
 
 void print_small_report(std_small_report_t rep) {
@@ -53,7 +53,6 @@ void print_full_report(std_input_report_t in) {
 	}
 	
 }
-
 
 void print_input_report(std_input_report_t rep) {
 	printf("ID: 0x%04x\n", rep.id);
@@ -121,6 +120,32 @@ void jc_set_rumble(joycon_t *jc, int frequency, int intensity) {
 	jc_send_rcmd(jc, &cmd);
 }
 
+int jc_get_joycons(joycon_t *buf, int s) {
+	struct hid_device_info *hids = hid_enumerate(0x057e, 0);
+	struct hid_device_info *begin = hids;
+	int n = 0;
+	while (begin) {
+		if (begin->product_id >> 4 == 0x200)
+			++n;
+		begin = begin->next;
+	}
+
+	if (buf) {
+		begin = hids;
+		while (begin && s) {
+			memset(buf, 0, sizeof(*buf));
+			buf->type = begin->product_id == 0x2006 ? LEFT : RIGHT;
+			buf->dev = hid_open(begin->vendor_id, begin->product_id, begin->serial_number);
+			buf->serial = strdup((void*)begin->serial_number);
+			++buf;
+			--s;
+			begin = begin->next;
+		}
+	}
+	hid_free_enumeration(hids);
+	return n;
+}
+
 joycon_t *jc_get_joycon(jctype_t type) {
 	hid_device *dev = hid_open(0x057e, type == LEFT ? 0x2006 : 0x2007, 0);
 	if (!dev)
@@ -154,8 +179,8 @@ void jc_poll(joycon_t *jc) {
 	do {
 		jc_read_message(jc, &res);
 	} while (res.id != 0x30);
-	jc->bs.connection = res.full.ci;
-	jc->bs.battery = res.full.bs;
+	jc->connection = res.full.ci;
+	jc->battery = res.full.bs;
 	jc->rbuttons = res.full.buttons;
 
 	int sh, sv;
@@ -316,7 +341,7 @@ void jc_print_joycon(joycon_t *left) {
 		"Full"
 	};
 	printf("Name: %s\n", left->type == LEFT ? "Joycon L" : "Joycon R");
-	printf("Battery: %s\n", battery_str[left->bs.battery]);
+	printf("Battery: %s\n", battery_str[left->battery]);
 	printf("Deadzone Range: [%5u, %5u]\n", left->stick_prop.deadzone, left->stick_prop.range);
 	printf("Raw Stick [%5u %5u]\n", left->rstick[0], left->rstick[1]);
 	if (left->type == LEFT) {
@@ -330,36 +355,36 @@ void jc_print_joycon(joycon_t *left) {
 	}
 	if (left->type == LEFT) {
 		printf("up: %9s down: %9s left: %9s right: %9s\n",
-			   left->buttons.up ? "pressed" : "released",
-			   left->buttons.down ? "pressed" : "released",
-			   left->buttons.left ? "pressed" : "released",
-			   left->buttons.right ? "pressed" : "released");
+			   left->up ? "pressed" : "released",
+			   left->down ? "pressed" : "released",
+			   left->left ? "pressed" : "released",
+			   left->right ? "pressed" : "released");
 		printf("L: %9s ZL: %9s Left Stick Button: %9s\n",
-			   left->buttons.l ? "pressed" : "released",
-			   left->buttons.zl ? "pressed" : "released",
-			   left->buttons.ls ? "pressed" : "released");
+			   left->l ? "pressed" : "released",
+			   left->zl ? "pressed" : "released",
+			   left->ls ? "pressed" : "released");
 		printf("Capture: %9s Minus: %9s\n",
-			   left->buttons.capture ? "pressed" : "released",
-			   left->buttons.minus ? "pressed" : "released");
+			   left->capture ? "pressed" : "released",
+			   left->minus ? "pressed" : "released");
 		printf("SL: %9s SR: %9s\n",
-			   left->buttons.lsl ? "pressed" : "released",
-			   left->buttons.lsr ? "pressed" : "released");
+			   left->lsl ? "pressed" : "released",
+			   left->lsr ? "pressed" : "released");
 	} else {
 		printf("A: %9s B: %9s X: %9s Y: %9s\n",
-			   left->buttons.a ? "pressed" : "released",
-			   left->buttons.b ? "pressed" : "released",
-			   left->buttons.x ? "pressed" : "released",
-			   left->buttons.y ? "pressed" : "released");
+			   left->a ? "pressed" : "released",
+			   left->b ? "pressed" : "released",
+			   left->x ? "pressed" : "released",
+			   left->y ? "pressed" : "released");
 		printf("R: %9s ZR: %9s Right Stick Button: %9s\n",
-			   left->buttons.r ? "pressed" : "released",
-			   left->buttons.zr ? "pressed" : "released",
-			   left->buttons.rs ? "pressed" : "released");
+			   left->r ? "pressed" : "released",
+			   left->zr ? "pressed" : "released",
+			   left->rs ? "pressed" : "released");
 		printf("Home: %9s Plus: %9s\n",
-			   left->buttons.home ? "pressed" : "released",
-			   left->buttons.plus ? "pressed" : "released");
+			   left->home ? "pressed" : "released",
+			   left->plus ? "pressed" : "released");
 		printf("SL: %9s SR: %9s\n",
-			   left->buttons.rsl ? "pressed" : "released",
-			   left->buttons.rsr ? "pressed" : "released");
+			   left->rsl ? "pressed" : "released",
+			   left->rsr ? "pressed" : "released");
 	}
 	puts("\n\n");
 }

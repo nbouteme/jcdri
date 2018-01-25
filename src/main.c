@@ -11,16 +11,11 @@
 #include <pthread.h>
 #include <sys/poll.h>
 
-#include "joycon.h"
-#include "rumble.h"
+#include <joycon.h>
+#include <rumble.h>
 
-#define assert_null(x) {												\
-		int __error_code = x;											\
-		if (__error_code) {												\
-			fprintf(stderr, "Failed at %s:%d\n", __FILE__, __LINE__);	\
-			return 1;													\
-		}																\
-	}																	\
+#include "devices/single_dev.h"
+#include "devices/dual_dev.h"
 
 void setup_new_jc(joycon_t *jc) {
 	jc_set_player_leds(jc, 0xF0);
@@ -83,9 +78,32 @@ int main()
 	char dsvalid = 0;
 
 	uint8_t rb[9] = {0};
-	//rb[0] = next_tick();
 	make_rumble_data(320, 160, 0.5, 0.5, rb + 1);
+//	joycon_t *known_jcs = 0;
+//	int nknown_jcs = 0;
 	while (1) {
+		int jc_get_joycons(joycon_t *buf, int s);
+
+		int njcs = jc_get_joycons(0, 0);
+		joycon_t *buf = malloc(sizeof(joycon_t[njcs]));
+
+		for (int i = 0; i < njcs; ++i) {
+		}
+		
+		
+		free(buf);
+		/*
+		  Recuperer les joycons
+		  Souvenir de ceux qui ne le sont pas déjà
+		  poll inputs
+		  ceux qui sont sr+sl -> ajouté aux association singles
+		  ceux qui sont l -> ajouté au association pairs
+		  ceux qui sont r -> ajouté aux association pairs
+		  si pair l/r complete, ajouter pair à association dual
+		  si b/down, retirer de l'association
+		  si déconnecté, retirer des souvenirs
+		  si tout est associé et validé, sortie
+		 */
 		try_pair_joycon(LEFT, &left, &lsvalid, dsvalid);
 		try_pair_joycon(RIGHT, &right, &rsvalid, dsvalid);
 
@@ -98,7 +116,8 @@ int main()
 			break;
 
 		if (left && right && !lsvalid && !rsvalid) {
-			if (!dsvalid && left->buttons.l && right->buttons.r) {
+			if (!dsvalid && left->l && right->r) {
+				rb[0] = next_tick();
 				jc_set_player_leds(left, 0x10);
 				jc_set_player_leds(right, 0x10);
 				memcpy(left->rumble_data, rb + 1, 8);
@@ -112,7 +131,7 @@ int main()
 				dsvalid = 1;
 			}
 			if (dsvalid == 1) {
-				if (right->buttons.a) {
+				if (right->a) {
 					jc_set_player_leds(left, 0x01);
 					jc_set_player_leds(right, 0x01);
 					memcpy(left->rumble_data, rb + 1, 8);
@@ -125,7 +144,7 @@ int main()
 
 					dsvalid = 2;
 				}
-				if (right->buttons.b) {
+				if (right->b) {
 					jc_set_player_leds(left, 0xF0);
 					jc_set_player_leds(right, 0xF0);
 					dsvalid = 0;
@@ -144,9 +163,9 @@ int main()
 		// et valider avec A ou quitter avec B;
 	}
 
-	jc_device_t *ldev = 0;
-	jc_device_t *rdev = 0;
-	djc_device_t *ddev = 0;
+	jc_dev_interface_t *ldev = 0;
+	jc_dev_interface_t *rdev = 0;
+	jc_dev_interface_t *ddev = 0;
 
 	if (dsvalid == 2) {
 		ddev = jd_device_from_jc2(left, right);
@@ -168,17 +187,13 @@ int main()
 		}
 	}
 
-	jc_dev_interface_t *devs[3];
-	devs[0] = &ldev->base;
-	devs[1] = &rdev->base;
-	devs[2] = &ddev->base;
+	jc_dev_interface_t *devs[3] = {ldev, rdev, ddev};
+
 	while (1) {
 		int n = jd_wait_readable(3, devs);
 		for (int i = 0; i < n; ++i) {
 			devs[i]->run_events(devs[i]);
 		}
 	}
-	// unreachable
-	//libevdev_uinput_destroy(uidev);
     return 0;
 }
