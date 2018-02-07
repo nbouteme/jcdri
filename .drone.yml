@@ -1,8 +1,8 @@
 pipeline:
   build:
     image: node
-      commands:
-        - mkdir -p build
-        - cd build
-        - cmake ..
-        - make
+    commands:
+      - mkdir -p build
+      - cd build
+      - cmake ..
+      - make
