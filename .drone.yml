@@ -2,4 +2,4 @@ pipeline:
   build:
     image: base/archlinux
     commands:
-      - pacman -Sy && pacman -S libevdev hidapi gcc cmake make pkg-config && mkdir -p build && cd build && cmake .. && make
+      - pacman -Sy && pacman -S libevdev hidapi gcc cmake make pkg-config libsystemd && mkdir -p build && cd build && cmake .. && make
