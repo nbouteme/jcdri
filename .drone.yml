@@ -1,7 +1,8 @@
 pipeline:
   build:
-    image: lycantropos/cmake
+    image: base/archlinux
     commands:
+      - pacman -Sy && pacman -S libevdev hidapi glib2
       - mkdir -p build
       - cd build
       - cmake ..
