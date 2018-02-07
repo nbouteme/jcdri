@@ -1,6 +1,6 @@
 pipeline:
     build:
-        image: jcdripp
+        image:
             commands:
             - mkdir -p build
             - cd build
