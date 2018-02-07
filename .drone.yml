@@ -1,6 +1,6 @@
 pipeline:
   build:
-    image: node
+    image: rikorose/gcc-cmake
     commands:
       - mkdir -p build
       - cd build
