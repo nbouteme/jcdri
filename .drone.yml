@@ -1,6 +1,6 @@
 pipeline:
   build:
-    image: rikorose/gcc-cmake
+    image: lycantropos/cmake
     commands:
       - mkdir -p build
       - cd build
