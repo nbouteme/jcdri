@@ -1,12 +1,13 @@
 #include "utils.h"
 #include <stdio.h>
+#include <stdint.h>
 
 void dev_error(hid_device *d, const char *str) {
 	const void *ptr = hid_error(d);
 	if (!ptr)
 		return;
 	printf("%s", str);
-	fputws(ptr, stdout);
+	puts((char*)ptr);
 	puts("");
 }
 

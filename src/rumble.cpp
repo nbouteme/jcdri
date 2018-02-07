@@ -51,7 +51,7 @@ void make_rumble_data(float fhf, float flf,
 	set_rdata(buf + 4, hf, lf, fha_to_u8(fha), fla_to_u16(fla));
 }
 
-void play_freq(joycon_t *jc,
+void play_freq(jcdri::joycon *jc,
 			   float fhf, float flf,
 			   float fha, float fla,
 			   int duration) {
@@ -66,13 +66,13 @@ void play_freq(joycon_t *jc,
 	set_rdata(buf + 5, hf, lf, fha_to_u8(fha), fla_to_u16(fla));
 	memcpy(jc->rumble_data, buf + 1, 8);
 	make_rumble_data(fhf, flf, fha, fla, jc->rumble_data);
-	jc_set_vibration(jc, 1);
-	jc_send_rumble(jc, buf);
+	jc->set_vibration(1);
+	jc->send_rumble(buf);
 	usleep(duration);
 	buf[0] = 1;
 	set_rdata(buf + 1, 0x0400, 0x01, 0, 0x8040);
 	set_rdata(buf + 5, 0x0400, 0x01, 0, 0x8040);
-	jc_set_vibration(jc, 0);
+	jc->set_vibration(0);
 	memcpy(jc->rumble_data, buf + 1, 8);
-	jc_send_rumble(jc, buf);
+	jc->send_rumble(buf);
 }

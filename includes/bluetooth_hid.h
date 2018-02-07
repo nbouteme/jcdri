@@ -6,32 +6,30 @@
 
 typedef unsigned uint;
 
-struct subcommand_reply_s {
+struct subcommand_reply {
 	uint8_t ack;
 	uint8_t reply_to;
 	uint8_t data[35];	
 } PACKED;
 
-typedef struct frame_data_s {
+struct frame_data {
 	uint8_t data[38];	
-} PACKED frame_data_t;
+} PACKED;
 
-typedef struct int16vec3_s {
+struct int16vec3 {
 	int16_t x, y, z;
-} PACKED int16vec3_t;
+} PACKED;
 
-typedef struct imu_frame_s {
-	int16vec3_t acc;
-	int16vec3_t gyro;
-} PACKED imu_frame_t;
+struct imu_frame {
+	int16vec3 acc;
+	int16vec3 gyro;
+} PACKED;
 
-typedef struct full_input_s {
-	imu_frame_t frames[3];
-} PACKED full_input_t;
+struct full_input {
+	imu_frame frames[3];
+} PACKED;
 
-typedef struct subcommand_reply_s subcommand_reply_t;
-
-typedef struct std_full_report_s {
+struct std_full_report {
 	uint8_t timer;
 	uint ci : 4;
 	uint bs : 4;
@@ -42,54 +40,54 @@ typedef struct std_full_report_s {
 	uint right_stick_y : 12;
 	uint vibrator_report : 8;
 	union {
-		subcommand_reply_t reply;
-		full_input_t imu_samples;
+		subcommand_reply reply;
+		full_input imu_samples;
 	};
-} PACKED std_full_report_t;
+} PACKED;
 
-typedef struct std_small_report_s {
+struct std_small_report {
 	uint buttons : 16;
 	uint stick : 8;
 	uint8_t filler[8];
-} PACKED std_small_report_t;
+} PACKED;
 
-typedef struct std_input_report_s {
+struct std_input_report {
 	uint8_t id;
 	union {
-		std_small_report_t std;
-		std_full_report_t full;
+		std_small_report std;
+		std_full_report full;
 	};
-} PACKED std_input_report_t;
+} PACKED;
 
-typedef struct spi_read_args_s {
+struct spi_read_args {
 	uint32_t addr;
 	uint8_t size;
-} PACKED spi_read_args_t;
+} PACKED;
 
-typedef struct {
+struct output_cmd {
 	uint unused : 4;
 	uint timer : 4;
 	uint8_t rumble_data[8];
 	uint8_t sub_cmd;
 	union {
 		uint8_t rargs[38];
-		spi_read_args_t spi_read_args;
+		spi_read_args sra;
 		/* TODO: Add more argument types */
 	};
-} PACKED output_cmd_t;
+} PACKED;
 
-typedef struct {
+struct rumble_cmd {
 	uint unused : 4;
 	uint timer : 4;
 	uint8_t rumble_data[8];
-} PACKED rumble_cmd_t;
+} PACKED;
 
-typedef struct std_output_report_s {
+struct std_output_report {
 	uint8_t id;
 	union {
-		output_cmd_t cmd;
-		rumble_cmd_t rumble;
+		output_cmd cmd;
+		rumble_cmd rumble;
 	};
-} PACKED std_output_report_t;
+} PACKED;
 
 #endif /* BLUETOOTH_HID_H */
