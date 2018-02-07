@@ -1,8 +1,8 @@
 pipeline:
-    build:
-        image:
-            commands:
-            - mkdir -p build
-            - cd build
-            - cmake ..
-            - make
+  build:
+    image:
+      commands:
+        - mkdir -p build
+        - cd build
+        - cmake ..
+        - make
