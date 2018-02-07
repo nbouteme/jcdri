@@ -1,9 +1,8 @@
 pipeline:
-	build:
-		image: jcdripp
-		commands:
-			- mkdir -p build
-			- cd build
-			- cmake ..
-			- make
-
+    build:
+        image: jcdripp
+            commands:
+            - mkdir -p build
+            - cd build
+            - cmake ..
+            - make
