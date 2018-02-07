@@ -1,6 +1,6 @@
 pipeline:
   build:
-    image:
+    image: node:latest
       commands:
         - mkdir -p build
         - cd build
