@@ -1,4 +1,4 @@
-#include "dual_dev.h"
+#include <devices/dual_dev.h>
 #include <event_loop.h>
 #include <limits.h>
 

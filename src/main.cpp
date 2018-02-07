@@ -11,15 +11,14 @@
 #include <linux/un.h>
 #include <unistd.h>
 
-#include <waitable.h>
-#include "udev.h"
+#include <udev.h>
 #include <joycon.h>
 
 #include <event_loop.h>
 #include <ipc_source.h>
 
-#include "devices/single_dev.h"
-#include "devices/dual_dev.h"
+#include <devices/single_dev.h>
+#include <devices/dual_dev.h>
 
 #include <rumble.h>
 
