@@ -1,5 +1,5 @@
 pipeline:
   build:
-    image: base/archlinux
+    image: jcdri_env
     commands:
-      - pacman -Sy && pacman -S libevdev hidapi gcc cmake make pkg-config libsystemd systemd && mkdir -p build && cd build && cmake .. && make
+      - pacman -Syu && mkdir -p build && cd build && cmake .. && make
