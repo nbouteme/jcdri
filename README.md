@@ -1,4 +1,4 @@
-![kek](http://drone.kuriyama.moe/api/badges/nbouteme/jcdri/status.svg)
+[![Build Status](http://drone.kuriyama.moe/api/badges/nbouteme/jcdri/status.svg)](http://drone.kuriyama.moe/nbouteme/jcdri)
 # jcdri
 User-mode Nintendo Switch® Joy-Con© Driver for GNU/Linux
 
