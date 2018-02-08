@@ -1,8 +1,5 @@
 pipeline:
   build:
-    image: node:latest
-      commands:
-        - mkdir -p build
-        - cd build
-        - cmake ..
-        - make
+    image: jcdri_env
+    commands:
+      - pacman -Syu && mkdir -p build && cd build && cmake .. && make
