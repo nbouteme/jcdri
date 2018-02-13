@@ -7,9 +7,11 @@
 #include <libevdev/libevdev.h>
 #include <linux/uinput.h>
 #include <sys/poll.h>
+#include <deque>
 #include <memory>
 
 #include <source.h>
+#include <ipc_source.h>
 #include <udev.h>
 #include "rumble.h"
 
@@ -166,7 +168,7 @@ namespace jcdri {
 		int send_rcmd(std_output_report&);
 		int send_cmd(std_output_report&);
 		int send_rumble(unsigned char *);
-		int read_message(std_input_report &res);
+		int read_message(std_input_report &res, int ass);
 		int set_rumble(int freq, int intensity);
 		void set_mode(jcinput);
 		int get_player_leds();
@@ -178,7 +180,9 @@ namespace jcdri {
 		void print();
 
 		joycon();
-		joycon(libudev::device &raw, libudev::device &hid);
+		joycon(libudev::device &raw, const std::string &s);
+		joycon(hid_device_info *info);
+		~joycon();
 	} __attribute__((packed));
 
 	joycon   *jc_get_joycon(joycon::jctype type);
@@ -193,17 +197,20 @@ namespace jcdri {
 		virtual void play_effect(int) = 0;
 		virtual void stop_effect(int) = 0;
 		virtual void post_events() = 0;
-
+		
 		void upload_effect(struct ff_effect effect);
 		void erase_effect(int id_effect);
 		void handle_input_events();
-
-	jc_device(event_loop *e) : source(e) {}
+		
+		~jc_device();
 		struct libevdev *dev;
 		struct libevdev_uinput *uidev;
 		int uifd;
 		struct ff_effect rumble_patterns[10];
 		int used_patterns;
+		ipc_source::dev_type type;
+	protected:
+		jc_device(event_loop *e);
 	};
 
 	int next_tick();

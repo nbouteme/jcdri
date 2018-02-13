@@ -51,6 +51,15 @@ namespace jcdri {
 			EVENT,
 			SUCCESS,
 		};
+
+		enum dev_type {
+			SINGLE,
+			DUAL,
+			DUAL_KEYBOARD,
+			MOUSE,
+			CUSTOM,
+			DUAL_CUSTOM
+		};
 	};
 }
 #endif /* IPCSOURCE_H */

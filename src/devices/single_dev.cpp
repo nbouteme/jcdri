@@ -64,7 +64,7 @@ namespace jcdri {
 			assert_null(libevdev_uinput_write_event(uidev, EV_KEY, BTN_START, jc->plus));
 			assert_null(libevdev_uinput_write_event(uidev, EV_KEY, BTN_SELECT, jc->home));
 		}
-	
+
 		assert_null(libevdev_uinput_write_event(uidev, EV_SYN, SYN_REPORT, 0));
 	}
 
@@ -90,11 +90,13 @@ namespace jcdri {
 		jc->set_vibration(0);
 	}
 
-	single_dev::single_dev(event_loop *el, std::shared_ptr<joycon> _jc)
+	single_dev::single_dev(event_loop *el, const std::shared_ptr<joycon> &_jc)
 		: jc_device(el), jc(_jc) {
+		puts("Building a single dev");
 		jc->jdev = this;
+		jc->set_player_leds(0x01);
 		char name[] = "EJoycon L";
-		dev = 	libevdev_new();
+		dev = libevdev_new();
 		struct input_absinfo ain[2] = { {
 				(int)jc->rstick[0],
 				(int)jc->lcal.min_x, (int)jc->lcal.max_x,
@@ -121,6 +123,9 @@ namespace jcdri {
 		libevdev_set_name(dev, name);
 		libevdev_set_id_vendor(dev, 0x5652);
 		libevdev_set_id_product(dev, 0x4432 + (jc->type != joycon::LEFT));
+
+		//assert_null(libevdev_enable_property(dev, INPUT_PROP_DIRECT));
+		//assert_null(libevdev_enable_property(dev, INPUT_PROP_ACCELEROMETER));
 
 		assert_null(libevdev_enable_property(dev, INPUT_PROP_BUTTONPAD));
 

@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <assert.h>
+#include <event_loop.h>
 
 #include "udev.h"
 #include <joycon.h>
@@ -83,10 +84,16 @@ namespace jcdri {
 		return pn++;
 	}
 
-	int joycon::read_message(std_input_report &res) {
-		if (hid_read(dev, (unsigned char*)&res, sizeof(res)) < 0) {
+	int joycon::read_message(std_input_report &res, int assert_size = -1) {
+		int n;
+		// TODO: make a message queue
+		if ((n = hid_read(dev, (unsigned char*)&res, sizeof(res))) < 0) {
 			dev_error(dev, "Failed to write");
 			return 0;
+		}
+		if (assert_size >= 0 && n != assert_size) {
+			printf("Expected %d, got %d bytes\n", assert_size, n);
+			abort();
 		}
 		return 1;
 	}
@@ -126,80 +133,6 @@ namespace jcdri {
 		return 1;
 	}
 
-/*
-  int jc_get_joycons(joycon *buf, int s) {
-  static joycon *joycons = 0;
-  static int njoycons = 0;
-
-  struct hid_device_info *hids = hid_enumerate(0x057e, 0);
-  struct hid_device_info *begin = hids;
-
-  int n = 0;
-  while (begin) {
-  if (begin->product_id >> 4 == 0x200)
-  ++n;
-  begin = begin->next;
-  }
-
-  if (n != njoycons) {
-  begin = hids;
-  for (int i = 0; i < njoycons; ++i) {
-  hid_close(joycons[i].dev);
-  free(joycons[i].serial);
-  }
-  free(joycons);
-  joycons = calloc(n, sizeof(joycon_t));
-  for (int i = 0; i < n; ++i) {
-  joycons[i].type = begin->product_id == 0x2006 ? LEFT : RIGHT;
-  joycons[i].dev = hid_open(begin->vendor_id, begin->product_id, begin->serial_number);
-  joycons[i].serial = strdup((void*)begin->serial_number);
-  begin = begin->next;
-  }
-  njoycons = n;
-  }
-
-  if (buf) {
-  memcpy(buf, joycons, sizeof(joycon_t[s < njoycons ? s : njoycons]));
-  }
-  hid_free_enumeration(hids);
-  return n;
-  }
-
-  int joycon_cmp(const void *a, const void *b) {
-  const joycon_t *ja = a, *jb = b;
-  return ja->type == jb->type && strcmp(ja->serial, jb->serial) == 0;
-  }
-
-  GPtrArray *jc_get_new_joycons(GPtrArray *oldjoycons) {
-  int n = jc_get_joycons(0, 0);
-  GPtrArray *newjcs = g_ptr_array_new();
-  joycon_t *connected_joycons = malloc(sizeof(joycon_t[n]));
-  jc_get_joycons(connected_joycons, n);
-  for (int i = 0; i < n; ++i)
-  if (!g_ptr_array_find_with_equal_func(oldjoycons,
-  connected_joycons + i,
-  joycon_cmp,
-  0)) {
-  joycon_t *jc = memcpy(malloc(sizeof(*jc)), connected_joycons + i, sizeof(*jc));
-  g_ptr_array_add(newjcs, jc);
-  }
-  free(connected_joycons);
-  return newjcs;
-  }
-
-  joycon_t *jc_get_joycon(jctype_t type) {
-  hid_device *dev = hid_open(0x057e, type == LEFT ? 0x2006 : 0x2007, 0);
-  if (!dev)
-  return 0;
-  joycon_t *ret = malloc(sizeof(*ret));
-  memset(ret, 0, sizeof(*ret));
-  ret->type = type;
-  ret->dev = dev;
-  ret->serial = 0;
-  return ret;
-  }
-*/
-
 	void joycon::set_mode(jcinput mode) {	
 		std_output_report cmd;
 
@@ -217,7 +150,8 @@ namespace jcdri {
 		if (mode != FULL)
 			set_mode(FULL);	
 		do {
-			read_message(res);
+			if (!read_message(res))
+				return;
 		} while (res.id != 0x30);
 		connection = res.full.ci;
 		battery = res.full.bs;
@@ -283,10 +217,11 @@ namespace jcdri {
 		send_cmd(cmd);
 		do {
 			read_message(res);
-		} while (res.id != 0x21 || res.full.reply.reply_to != cmd.cmd.sub_cmd);
+		} while (res.id != 0x21);
+		if (res.full.reply.reply_to != cmd.cmd.sub_cmd)
+			abort();
 		return res;
 	}
-
 
 	void joycon::set_imu(uint8_t val) {
 		std_output_report cmd;
@@ -370,6 +305,8 @@ namespace jcdri {
 		printf("Battery: %s\n", battery_str[battery]);
 		printf("Deadzone Range: [%5u, %5u]\n", stick_prop.deadzone, stick_prop.range);
 		printf("Raw Stick [%5u %5u]\n", rstick[0], rstick[1]);
+		printf("Gyroscope [%5d, %5d, %5d]\n", gyro_comp.x, gyro_comp.y, gyro_comp.z);
+		printf("Accelerometre [%5d, %5d, %5d]\n", acc_comp.x, acc_comp.y, acc_comp.z);
 		if (type == LEFT) {
 			printf("Max XY [%5u %5u]\n", lcal.max_x, lcal.max_y);
 			printf("Center XY [%5u %5u]\n", lcal.cen_x, lcal.cen_y);
@@ -415,14 +352,29 @@ namespace jcdri {
 		puts("\n\n");
 	}
 
-	joycon::joycon(libudev::device &hidraw, libudev::device &hid) {
+	joycon::joycon(hid_device_info *info) {
+		dev = hid_open_path(info->path);
+		serial = strdup((char*)info->serial_number);
+		if(info->product_id == 0x2006)
+			type = LEFT;
+		else
+			type = RIGHT;
+	}
+
+	joycon::joycon(libudev::device &hidraw, const std::string &s) {
 		dev = hid_open_path(hidraw.get_devnode().c_str());
-		serial = strdup(hid.get_property_value("HID_UNIQ").c_str());
+		serial = strdup(s.c_str());
 		unsigned bus, vendor, product;
-		sscanf(hid.get_property_value("HID_ID").c_str(), "%x:%x:%x", &bus, &vendor, &product);
+		sscanf(s.c_str(), "%x:%x:%x", &bus, &vendor, &product);
 		if(product == 0x2006)
 			type = LEFT;
 		else
 			type = RIGHT;
+	}
+
+	joycon::~joycon() {
+		puts("destructing joycon");
+		if (jdev)
+			jdev->el->remove_source(jdev);
 	}
 }

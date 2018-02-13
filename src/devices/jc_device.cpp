@@ -64,4 +64,14 @@ namespace jcdri {
 			break;
 		}
 	}
+
+
+	jc_device::jc_device(event_loop *e) : source(e) {
+	}
+
+	jc_device::~jc_device() {
+		puts("destructing jcdevice");
+		libevdev_uinput_destroy(uidev);
+		libevdev_free(dev);
+	}
 }

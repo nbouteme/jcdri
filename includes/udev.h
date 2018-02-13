@@ -32,7 +32,7 @@ namespace libudev {
 		device from_devnum(char type, dev_t devnum);
 		device from_subsystem_sysname(const std::string &, const std::string &);
 		device from_device_id(const std::string &);
-		device from_environment();		
+		device from_environment();
 
 		monitor from_netlink(const std::string &);
 		enumerate new_enumerate();

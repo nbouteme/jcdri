@@ -1,5 +1,7 @@
 #include <ipc_source.h>
 #include <cassert>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 namespace jcdri {
 	ipc_source::client::client(event_loop *el, ipc_source *_ipcs, int _fd) :
@@ -48,26 +50,26 @@ namespace jcdri {
 			perror("read()");
 			assert(0);
 		}
-		printf("%s:%d -> read %d bytes\n", __FILE__, __LINE__, n);
 		n = ::read(client, &sz, sizeof(sz));
 		if (n < 0) {
 			perror("read()");
 			assert(0);
 		}
-		printf("%s:%d -> read %d bytes\n", __FILE__, __LINE__, n);
 		data.resize(sz);
 		n = ::read(client, data.data(), data.size());
 		if (n < 0) {
 			perror("read()");
 			assert(0);
 		}
-		printf("%s:%d -> read %d bytes\n", __FILE__, __LINE__, n);
 		if (ipcs->handlers[op])
 			ret = ipcs->handlers[op](this, data);
 		return ret;
 	}
 
 	ipc_source::ipc_source(event_loop *_el) : source(_el) {
+		if (access("/run/jcdri", F_OK) < 0) {
+			mkdir("/run/jcdri", 0755);
+		}
 		sockaddr_un uaddr;
 		uaddr.sun_family = AF_UNIX;
 		auto path = "/run/jcdri/ipc";

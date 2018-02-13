@@ -1,6 +1,20 @@
 #include <devices/dual_dev.h>
 #include <event_loop.h>
 #include <limits.h>
+#include <cassert>
+
+#ifdef assert_null
+#undef assert_null
+#endif
+
+#define assert_null(x) {												\
+		int __error_code = x;											\
+		if (__error_code) {												\
+			char *s = strerror(-__error_code);							\
+			fprintf(stderr, "Failed at %s:%d with code %d %s\n", __FILE__, __LINE__, __error_code, s); \
+			assert(0);													\
+		}																\
+	}																	\
 
 namespace jcdri {
 
@@ -14,9 +28,9 @@ namespace jcdri {
 
 	void dual_dev::post_events() {
 		assert_null(libevdev_uinput_write_event(uidev, EV_ABS, 0, left->rstick[0]));
-		assert_null(libevdev_uinput_write_event(uidev, EV_ABS, 1, -left->rstick[1]));
+		assert_null(libevdev_uinput_write_event(uidev, EV_ABS, 1, left->rstick[1]));
 		assert_null(libevdev_uinput_write_event(uidev, EV_ABS, 2, right->rstick[0]));
-		assert_null(libevdev_uinput_write_event(uidev, EV_ABS, 3, -right->rstick[1]));
+		assert_null(libevdev_uinput_write_event(uidev, EV_ABS, 3, right->rstick[1]));
 		if (left->imu_enabled && right->imu_enabled) {
 			assert_null(libevdev_uinput_write_event(uidev, EV_ABS,  4, left->acc_comp.x));
 			assert_null(libevdev_uinput_write_event(uidev, EV_ABS,  5, left->acc_comp.y));
@@ -87,6 +101,8 @@ namespace jcdri {
 		  right(_right) {
 		char name[] = "EJoycon Dual";
 		left->jdev = right->jdev = this;
+		left->set_player_leds(0x03);
+		right->set_player_leds(0x03);
 		dev = libevdev_new();
 		struct input_absinfo base = {
 			0, -100, 100, 0, 0, 1
@@ -120,6 +136,9 @@ namespace jcdri {
 		libevdev_set_id_vendor(dev, 0x5652);
 		libevdev_set_id_product(dev, 0x4444);
 
+		assert_null(libevdev_enable_property(dev, INPUT_PROP_DIRECT));
+		assert_null(libevdev_enable_property(dev, INPUT_PROP_ACCELEROMETER));
+		
 		assert_null(libevdev_enable_property(dev, INPUT_PROP_BUTTONPAD));
 
 		assert_null(libevdev_enable_event_type(dev, EV_FF));
@@ -196,6 +215,7 @@ namespace jcdri {
 		assert_null(libevdev_enable_event_code(dev, EV_KEY, BTN_TRIGGER_HAPPY + 4, NULL));
 		assert_null(libevdev_enable_event_code(dev, EV_KEY, BTN_TRIGGER_HAPPY + 5, NULL));
 
+		uidev = 0;
 		assert_null(libevdev_uinput_create_from_device(dev, LIBEVDEV_UINPUT_OPEN_MANAGED, &uidev));
 		uifd = libevdev_uinput_get_fd(uidev);
 		pfd = {uifd, POLLIN | POLLOUT, 0};

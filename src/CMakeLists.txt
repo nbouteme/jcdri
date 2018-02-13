@@ -13,7 +13,9 @@ add_executable(jcdri
   utils.cpp
   rumble.cpp
   devices/dual_dev.cpp
+  devices/dual_keyboard.cpp
   devices/single_dev.cpp
+  devices/mouse_dev.cpp
   devices/jc_device.cpp
 #devices/single_dev.c
 #devices/keyboard_dual.c
@@ -26,12 +28,15 @@ add_executable(jccli
 )
 
 target_compile_options(jcdri PUBLIC -Wall -Wextra -Werror -g)
-target_compile_options(jccli PUBLIC -Wall -Wextra -Werror -g)
-
 target_include_directories(jcdri PUBLIC ../includes)
 target_include_directories(jcdri PUBLIC ${HIDAPI_INCLUDE_DIRS})
-#target_include_directories(jcdri PUBLIC ${GLIB_INCLUDE_DIRS})
 target_include_directories(jcdri PUBLIC ${LIBEVDEV_INCLUDE_DIRS})
+
+target_compile_options(jccli PUBLIC -Wall -Wextra -Werror -g)
+target_include_directories(jccli PUBLIC ../includes)
+target_include_directories(jccli PUBLIC ${HIDAPI_INCLUDE_DIRS})
+target_include_directories(jccli PUBLIC ${LIBEVDEV_INCLUDE_DIRS})
+
 target_link_libraries(jcdri PUBLIC ${HIDAPI_LIBRARIES} ${LIBEVDEV_LIBRARIES} m pthread)
 target_link_libraries(jcdri PUBLIC
   ${HIDAPI_LIBRARIES}
